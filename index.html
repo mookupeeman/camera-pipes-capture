@@ -9,10 +9,10 @@
     <h1>Camera Capture with Cropping and Google Drive Upload</h1>
     <button id="authorizeButton" style="display: none;">Authorize Google Drive</button>
     <video id="video" autoplay style="display: block; margin-bottom: 10px;"></video>
-    <canvas id="canvas" style="display: none;"></canvas> <!-- Hidden canvas for video feed -->
+    <canvas id="canvas" style="display: block; margin-bottom: 10px;"></canvas>
     <button id="captureButton" style="display: none;">Capture and Upload Image</button>
     <canvas id="capturedCanvas" style="display: block; margin-top: 10px;"></canvas>
-
+    
     <script>
         const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -111,6 +111,9 @@
         }
 
         captureButton.addEventListener('click', () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const width = canvas.width;
@@ -136,7 +139,7 @@
         async function getOrCreateFolder() {
             try {
                 let response = await gapi.client.drive.files.list({
-                    q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
+                    q: mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false,
                     fields: 'files(id, name)'
                 });
 
