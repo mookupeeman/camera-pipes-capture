@@ -3,54 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Capture and Save to Google Drive</title>
+    <title>Camera Capture with Google Drive</title>
 </head>
 <body>
-    <h1>Camera Capture and Save to Google Drive</h1>
-    <video id="video" autoplay></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <button id="captureButton">Capture Image</button>
-    <a id="downloadLink" style="display:none;">Download Cropped Image</a>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <h1>Camera Capture with Cropping and Google Drive Upload</h1>
+    <button id="authorizeButton" style="display: none;">Authorize Google Drive</button>
+    <video id="video" autoplay style="display: block; margin-bottom: 10px;"></video>
+    <canvas id="canvas" style="display: block; margin-bottom: 10px;"></canvas>
+    <button id="captureButton" style="display: none;">Capture and Upload Image</button>
+    <canvas id="capturedCanvas" style="display: block; margin-top: 10px;"></canvas>
+    
     <script>
-        // Google API variables
-        const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com'; // Replace with your actual Client ID
+        // Your JavaScript code here
+        const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com'; // Replace with your actual client ID
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const captureButton = document.getElementById('captureButton');
+        const authorizeButton = document.getElementById('authorizeButton');
+        const capturedCanvas = document.getElementById('capturedCanvas');
+        const capturedContext = capturedCanvas.getContext('2d');
+
+        let tokenClient;
         let gapiInited = false;
+        let gisInited = false;
 
-        // Load the Google API client
-        function loadClient() {
-            gapi.load('client:auth2', initializeGapiClient);
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
         }
 
-        // Initialize the Google API client
-        function initializeGapiClient() {
-            gapi.client.init({
-                clientId: CLIENT_ID,
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
                 scope: SCOPES,
-            }).then(() => {
-                gapiInited = true;
-                handleAuthClick();  // Automatically trigger the authorization
+                callback: '', // defined later
             });
+            gisInited = true;
+            maybeEnableButtons();
         }
 
-        // Handle Google Drive authorization
-        function handleAuthClick() {
-            gapi.auth2.getAuthInstance().signIn().then(() => {
-                console.log('Authorization successful!');
-            }, (error) => {
-                console.error('Authorization failed: ', error);
-            });
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                authorizeButton.style.display = 'block';
+            }
         }
 
-        // Access the user's camera
+        authorizeButton.onclick = () => {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                authorizeButton.style.display = 'none';
+                captureButton.style.display = 'block';
+                await startCamera();
+            };
+
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        };
+
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
 
-                // Once the video is playing, draw the rectangle
                 video.addEventListener('loadedmetadata', () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
@@ -62,114 +91,83 @@
             }
         }
 
-        // Draw the rectangle on the video feed
         function drawRectangleOnVideo() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const width = canvas.width;
             const height = canvas.height;
 
-            // Calculate crop dimensions
             const cropWidth = width * 0.8;
             const cropHeight = height * 0.8;
 
-            // Calculate the starting point
             const startX = (width - cropWidth) / 2;
             const startY = (height - cropHeight) / 2;
 
-            // Draw the rectangle on the video stream
             context.strokeStyle = 'red';
             context.lineWidth = 2;
             context.strokeRect(startX, startY, cropWidth, cropHeight);
 
-            // Continuously update the rectangle as the video feed changes
             requestAnimationFrame(drawRectangleOnVideo);
         }
 
-        // Capture the image from the video stream
         captureButton.addEventListener('click', () => {
-            // Set the canvas size to the video size
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
-            // Draw the current frame of the video onto the canvas
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const width = canvas.width;
             const height = canvas.height;
 
-            // Calculate crop dimensions
             const cropWidth = width * 0.8;
             const cropHeight = height * 0.8;
 
-            // Calculate the starting point
             const startX = (width - cropWidth) / 2;
             const startY = (height - cropHeight) / 2;
 
-            // Get the cropped image data
             const croppedImageData = context.getImageData(startX, startY, cropWidth, cropHeight);
 
-            // Create a temporary canvas to draw the cropped image
-            const croppedCanvas = document.createElement('canvas');
-            croppedCanvas.width = cropWidth;
-            croppedCanvas.height = cropHeight;
-            const croppedContext = croppedCanvas.getContext('2d');
-            croppedContext.putImageData(croppedImageData, 0, 0);
+            capturedCanvas.width = cropWidth;
+            capturedCanvas.height = cropHeight;
+            capturedContext.putImageData(croppedImageData, 0, 0);
 
-            // Convert the cropped canvas to a data URL
-            const croppedImageURL = croppedCanvas.toDataURL('image/png');
+            const croppedImageURL = capturedCanvas.toDataURL('image/png');
 
-            // Set up the download link
-            downloadLink.href = croppedImageURL;
-            downloadLink.download = 'cropped_image.png';
-            downloadLink.style.display = 'block';
-
-            // Upload the image to Google Drive
-            uploadToGoogleDrive(croppedImageURL);
+            uploadImageToDrive(croppedImageURL);
         });
 
-        // Upload the image to Google Drive
-        function uploadToGoogleDrive(imageDataURL) {
-            const boundary = '-------314159265358979323846';
-            const delimiter = "\r\n--" + boundary + "\r\n";
-            const close_delim = "\r\n--" + boundary + "--";
+        function uploadImageToDrive(imageDataUrl) {
+            const byteString = atob(imageDataUrl.split(',')[1]);
+            const mimeString = imageDataUrl.split(',')[0].split(':')[1].split(';')[0];
+            const buffer = new ArrayBuffer(byteString.length);
+            const uintArray = new Uint8Array(buffer);
 
-            const contentType = 'image/png';
+            for (let i = 0; i < byteString.length; i++) {
+                uintArray[i] = byteString.charCodeAt(i);
+            }
+
+            const blob = new Blob([buffer], { type: mimeString });
             const metadata = {
-                'name': 'captured_image.png',
-                'mimeType': contentType
+                name: 'captured_image_' + new Date().toISOString() + '.png',
+                mimeType: mimeString,
             };
 
-            const multipartRequestBody =
-                delimiter +
-                'Content-Type: application/json\r\n\r\n' +
-                JSON.stringify(metadata) +
-                delimiter +
-                'Content-Type: ' + contentType + '\r\n' +
-                '\r\n' +
-                imageDataURL.split(',')[1] +
-                close_delim;
-
-            const request = gapi.client.request({
-                'path': '/upload/drive/v3/files',
-                'method': 'POST',
-                'params': {'uploadType': 'multipart'},
-                'headers': {
-                    'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+            gapi.client.drive.files.create({
+                resource: metadata,
+                media: {
+                    mimeType: mimeString,
+                    body: blob
                 },
-                'body': multipartRequestBody
-            });
-
-            request.execute((file) => {
-                console.log('File uploaded successfully to Google Drive', file);
+                fields: 'id'
+            }).then(function(response) {
+                console.log('File uploaded, ID: ', response.result.id);
+            }, function(error) {
+                console.error('Error uploading file: ' + error);
             });
         }
-
-        // Start the camera and initialize the Google API on page load
-        window.onload = () => {
-            startCamera();
-            loadClient();
-        };
     </script>
+
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
