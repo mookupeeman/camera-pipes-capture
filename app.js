@@ -1,5 +1,4 @@
-const CLIENT_ID = 'YOUR_CLIENT_ID'; // Replace with your actual client ID
-const API_KEY = 'YOUR_API_KEY'; // Replace with your actual API key
+const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com'; // Replace with your actual client ID
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 const video = document.getElementById('video');
@@ -20,7 +19,6 @@ function gapiLoaded() {
 
 async function initializeGapiClient() {
     await gapi.client.init({
-        apiKey: API_KEY,
         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
     });
     gapiInited = true;
