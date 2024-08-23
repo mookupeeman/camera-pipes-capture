@@ -165,7 +165,7 @@
 
         async function uploadImageToDrive(imageDataUrl) {
             try {
-                const folderId = await getOrCreateFolder();
+                const folderId = '13VlMerTuMhIhnYLKz-yGXeU_eVgqwa6b'
 
                 const byteString = atob(imageDataUrl.split(',')[1]);
                 const mimeString = imageDataUrl.split(',')[0].split(':')[1].split(';')[0];
