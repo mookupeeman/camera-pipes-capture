@@ -118,35 +118,71 @@ captureButton.addEventListener('click', () => {
 
     uploadImageToDrive(croppedImageURL);
 });
+const FOLDER_NAME = 'Prince_Pipes__Mobile_Captures'; // Name of the folder to store images
 
-function uploadImageToDrive(imageDataUrl) {
-    const byteString = atob(imageDataUrl.split(',')[1]);
-    const mimeString = imageDataUrl.split(',')[0].split(':')[1].split(';')[0];
-    const buffer = new ArrayBuffer(byteString.length);
-    const uintArray = new Uint8Array(buffer);
+async function getOrCreateFolder() {
+    try {
+        // Check if folder already exists
+        let response = await gapi.client.drive.files.list({
+            q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
+            fields: 'files(id, name)'
+        });
 
-    for (let i = 0; i < byteString.length; i++) {
-        uintArray[i] = byteString.charCodeAt(i);
+        let files = response.result.files;
+        if (files && files.length > 0) {
+            // Folder exists, return its ID
+            return files[0].id;
+        } else {
+            // Folder doesn't exist, create it
+            let folderMetadata = {
+                name: FOLDER_NAME,
+                mimeType: 'application/vnd.google-apps.folder'
+            };
+            let folder = await gapi.client.drive.files.create({
+                resource: folderMetadata,
+                fields: 'id'
+            });
+            return folder.result.id;
+        }
+    } catch (err) {
+        console.error('Error creating/finding folder:', err);
+        throw err;
     }
+}
 
-    const blob = new Blob([buffer], { type: mimeString });
-    const metadata = {
-        name: 'captured_image_' + new Date().toISOString() + '.png',
-        mimeType: mimeString,
-    };
+async function uploadImageToDrive(imageDataUrl) {
+    try {
+        const folderId = await getOrCreateFolder();
 
-    gapi.client.drive.files.create({
-        resource: metadata,
-        media: {
+        const byteString = atob(imageDataUrl.split(',')[1]);
+        const mimeString = imageDataUrl.split(',')[0].split(':')[1].split(';')[0];
+        const buffer = new ArrayBuffer(byteString.length);
+        const uintArray = new Uint8Array(buffer);
+
+        for (let i = 0; i < byteString.length; i++) {
+            uintArray[i] = byteString.charCodeAt(i);
+        }
+
+        const blob = new Blob([buffer], { type: mimeString });
+        const metadata = {
+            name: 'captured_image_' + new Date().toISOString() + '.png',
             mimeType: mimeString,
-            body: blob
-        },
-        fields: 'id'
-    }).then(function(response) {
-        console.log('File uploaded, ID: ', response.result.id);
-    }, function(error) {
-        console.error('Error uploading file: ' + error);
-    });
+            parents: [folderId] // This line specifies the parent folder
+        };
+
+        let response = await gapi.client.drive.files.create({
+            resource: metadata,
+            media: {
+                mimeType: mimeString,
+                body: blob
+            },
+            fields: 'id'
+        });
+
+        console.log('File uploaded, ID:', response.result.id);
+    } catch (err) {
+        console.error('Error uploading file:', err);
+    }
 }
 
 // These function calls should be in the HTML, not in the script
