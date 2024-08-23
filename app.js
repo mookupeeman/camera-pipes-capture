@@ -164,26 +164,35 @@ async function uploadImageToDrive(imageDataUrl) {
         }
 
         const blob = new Blob([buffer], { type: mimeString });
+        const fileName = `captured_image_${new Date().toISOString()}.png`;
+
         const metadata = {
-            name: `captured_image_${new Date().toISOString()}.png`, // Ensuring the image is saved as .png
-            mimeType: 'image/png', // Explicitly specifying the mimeType as 'image/png'
+            name: fileName,
+            mimeType: 'image/png',
             parents: [folderId]
         };
 
-        let response = await gapi.client.drive.files.create({
-            resource: metadata,
-            media: {
-                mimeType: 'image/png',
-                body: blob
-            },
-            fields: 'id'
-        });
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
 
-        console.log('File uploaded, ID:', response.result.id);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', true);
+        xhr.setRequestHeader('Authorization', 'Bearer ' + gapi.auth.getToken().access_token);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                const response = JSON.parse(xhr.responseText);
+                if (xhr.status === 200) {
+                    console.log('File uploaded successfully, ID:', response.id);
+                } else {
+                    console.error('Error uploading file:', xhr.responseText);
+                }
+            }
+        };
+        xhr.send(form);
+
     } catch (err) {
         console.error('Error uploading file:', err);
     }
 }
-
-// These function calls should be in the HTML, not in the script
 // gapiLoaded();
