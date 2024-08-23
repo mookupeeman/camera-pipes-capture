@@ -1,4 +1,4 @@
-const CLIENT_ID = 'YOUR_CLIENT_ID';
+const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com'; // Replace with your actual client ID
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 const video = document.getElementById('video');
@@ -52,9 +52,9 @@ authorizeButton.onclick = () => {
     };
 
     if (gapi.client.getToken() === null) {
-        tokenClient.requestAccessToken({ prompt: 'consent' });
+        tokenClient.requestAccessToken({prompt: 'consent'});
     } else {
-        tokenClient.requestAccessToken({ prompt: '' });
+        tokenClient.requestAccessToken({prompt: ''});
     }
 };
 
@@ -118,14 +118,13 @@ captureButton.addEventListener('click', () => {
 
     uploadImageToDrive(croppedImageURL);
 });
-
 const FOLDER_NAME = 'Prince_Pipes__Mobile_Captures'; // Name of the folder to store images
 
 async function getOrCreateFolder() {
     try {
         // Check if folder already exists
         let response = await gapi.client.drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
+            q: mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false,
             fields: 'files(id, name)'
         });
 
@@ -168,13 +167,13 @@ async function uploadImageToDrive(imageDataUrl) {
         const metadata = {
             name: `captured_image_${new Date().toISOString()}.png`, // Ensuring the image is saved as .png
             mimeType: 'image/png', // Explicitly specifying the mimeType as 'image/png'
-            parents: [folderId] // This line specifies the parent folder
+            parents: [folderId]
         };
 
         let response = await gapi.client.drive.files.create({
             resource: metadata,
             media: {
-                mimeType: 'image/png', // Setting the mimeType to 'image/png'
+                mimeType: 'image/png',
                 body: blob
             },
             fields: 'id'
