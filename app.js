@@ -155,7 +155,7 @@ async function uploadImageToDrive(imageDataUrl) {
         const folderId = await getOrCreateFolder();
 
         const byteString = atob(imageDataUrl.split(',')[1]);
-        const mimeString = imageDataUrl.split(',')[0].split(':')[1].split(';')[0];
+        const mimeString = 'image/png';  // Explicitly set to PNG
         const buffer = new ArrayBuffer(byteString.length);
         const uintArray = new Uint8Array(buffer);
 
@@ -167,7 +167,7 @@ async function uploadImageToDrive(imageDataUrl) {
         const metadata = {
             name: 'captured_image_' + new Date().toISOString() + '.png',
             mimeType: mimeString,
-            parents: [folderId] // This line specifies the parent folder
+            parents: [folderId]
         };
 
         let response = await gapi.client.drive.files.create({
