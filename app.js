@@ -1,16 +1,33 @@
-// Get the elements
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const context = canvas.getContext('2d');
-const captureButton = document.getElementById('captureButton');
-const downloadLink = document.createElement('a');
-downloadLink.innerText = 'Download Cropped Image';
-downloadLink.style.display = 'none';
-document.body.appendChild(downloadLink);
+// Google API variables
+const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com'; // Replace with your actual Client ID
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-const capturedCanvas = document.createElement('canvas');
-const capturedContext = capturedCanvas.getContext('2d');
-document.body.appendChild(capturedCanvas);
+let gapiInited = false;
+
+// Load the Google API client
+function loadClient() {
+    gapi.load('client:auth2', initializeGapiClient);
+}
+
+// Initialize the Google API client
+function initializeGapiClient() {
+    gapi.client.init({
+        clientId: CLIENT_ID,
+        scope: SCOPES,
+    }).then(() => {
+        gapiInited = true;
+        handleAuthClick();  // Automatically trigger the authorization
+    });
+}
+
+// Handle Google Drive authorization
+function handleAuthClick() {
+    gapi.auth2.getAuthInstance().signIn().then(() => {
+        console.log('Authorization successful!');
+    }, (error) => {
+        console.error('Authorization failed: ', error);
+    });
+}
 
 // Access the user's camera
 async function startCamera() {
@@ -77,21 +94,64 @@ captureButton.addEventListener('click', () => {
     // Get the cropped image data
     const croppedImageData = context.getImageData(startX, startY, cropWidth, cropHeight);
 
-    // Set up the captured canvas to display the cropped image
-    capturedCanvas.width = cropWidth;
-    capturedCanvas.height = cropHeight;
-    capturedContext.putImageData(croppedImageData, 0, 0);
+    // Create a temporary canvas to draw the cropped image
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = cropWidth;
+    croppedCanvas.height = cropHeight;
+    const croppedContext = croppedCanvas.getContext('2d');
+    croppedContext.putImageData(croppedImageData, 0, 0);
 
-    // Convert the captured canvas to a data URL
-    const croppedImageURL = capturedCanvas.toDataURL('image/png');
+    // Convert the cropped canvas to a data URL
+    const croppedImageURL = croppedCanvas.toDataURL('image/png');
 
     // Set up the download link
     downloadLink.href = croppedImageURL;
     downloadLink.download = 'cropped_image.png';
     downloadLink.style.display = 'block';
 
-    // Optionally, save to a folder using backend integration (not covered here)
+    // Upload the image to Google Drive
+    uploadToGoogleDrive(croppedImageURL);
 });
 
-// Start the camera on page load
-startCamera();
+// Upload the image to Google Drive
+function uploadToGoogleDrive(imageDataURL) {
+    const boundary = '-------314159265358979323846';
+    const delimiter = "\r\n--" + boundary + "\r\n";
+    const close_delim = "\r\n--" + boundary + "--";
+
+    const contentType = 'image/png';
+    const metadata = {
+        'name': 'captured_image.png',
+        'mimeType': contentType
+    };
+
+    const multipartRequestBody =
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: ' + contentType + '\r\n' +
+        '\r\n' +
+        imageDataURL.split(',')[1] +
+        close_delim;
+
+    const request = gapi.client.request({
+        'path': '/upload/drive/v3/files',
+        'method': 'POST',
+        'params': {'uploadType': 'multipart'},
+        'headers': {
+            'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+        },
+        'body': multipartRequestBody
+    });
+
+    request.execute((file) => {
+        console.log('File uploaded successfully to Google Drive', file);
+    });
+}
+
+// Start the camera and initialize the Google API on page load
+window.onload = () => {
+    startCamera();
+    loadClient();
+};
