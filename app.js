@@ -1,5 +1,6 @@
-const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com'; // Replace with your actual client ID
+const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const FOLDER_NAME = 'Prince_Pipes__Mobile_Captures';
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -8,10 +9,12 @@ const captureButton = document.getElementById('captureButton');
 const authorizeButton = document.getElementById('authorizeButton');
 const capturedCanvas = document.getElementById('capturedCanvas');
 const capturedContext = capturedCanvas.getContext('2d');
+const captureStatus = document.getElementById('captureStatus');
 
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
+let imageCounter = 0;
 
 function gapiLoaded() {
     gapi.load('client', initializeGapiClient);
@@ -94,6 +97,7 @@ function drawRectangleOnVideo() {
 }
 
 captureButton.addEventListener('click', () => {
+    imageCounter++;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
@@ -114,26 +118,26 @@ captureButton.addEventListener('click', () => {
     capturedCanvas.height = cropHeight;
     capturedContext.putImageData(croppedImageData, 0, 0);
 
+    const originalImageURL = canvas.toDataURL('image/png');
     const croppedImageURL = capturedCanvas.toDataURL('image/png');
 
-    uploadImageToDrive(croppedImageURL);
+    uploadImageToDrive(originalImageURL, `image_${imageCounter}_original`);
+    uploadImageToDrive(croppedImageURL, `image_${imageCounter}_cropped`);
+
+    captureStatus.textContent = "Images have been captured and are being uploaded...";
 });
-const FOLDER_NAME = 'Prince_Pipes__Mobile_Captures'; // Name of the folder to store images
 
 async function getOrCreateFolder() {
     try {
-        // Check if folder already exists
         let response = await gapi.client.drive.files.list({
-            q: mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false,
+            q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
             fields: 'files(id, name)'
         });
 
         let files = response.result.files;
         if (files && files.length > 0) {
-            // Folder exists, return its ID
             return files[0].id;
         } else {
-            // Folder doesn't exist, create it
             let folderMetadata = {
                 name: FOLDER_NAME,
                 mimeType: 'application/vnd.google-apps.folder'
@@ -150,7 +154,7 @@ async function getOrCreateFolder() {
     }
 }
 
-async function uploadImageToDrive(imageDataUrl) {
+async function uploadImageToDrive(imageDataUrl, fileName) {
     try {
         const folderId = '13VlMerTuMhIhnYLKz-yGXeU_eVgqwa6b'
 
@@ -164,16 +168,13 @@ async function uploadImageToDrive(imageDataUrl) {
         }
 
         const blob = new Blob([buffer], { type: mimeString });
-        const fileName = `captured_image_${new Date().toISOString()}.png`;
-
-        const metadata = {
-            name: fileName,
-            mimeType: 'image/png',
-            parents: [folderId]
-        };
 
         const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('metadata', new Blob([JSON.stringify({
+            name: `${fileName}.png`,
+            mimeType: 'image/png',
+            parents: [folderId]
+        })], { type: 'application/json' }));
         form.append('file', blob);
 
         const xhr = new XMLHttpRequest();
@@ -184,8 +185,10 @@ async function uploadImageToDrive(imageDataUrl) {
                 const response = JSON.parse(xhr.responseText);
                 if (xhr.status === 200) {
                     console.log('File uploaded successfully, ID:', response.id);
+                    captureStatus.textContent = "Images have been captured and uploaded successfully!";
                 } else {
                     console.error('Error uploading file:', xhr.responseText);
+                    captureStatus.textContent = "Error uploading images. Please try again.";
                 }
             }
         };
@@ -193,6 +196,10 @@ async function uploadImageToDrive(imageDataUrl) {
 
     } catch (err) {
         console.error('Error uploading file:', err);
+        captureStatus.textContent = "Error uploading images. Please try again.";
     }
 }
+
+// These functions should be called when the respective scripts are loaded
 // gapiLoaded();
+// gisLoaded();
