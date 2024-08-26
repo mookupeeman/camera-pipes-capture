@@ -4,14 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Camera Capture with Google Drive</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #captureButton {
+            font-size: 20px;
+            padding: 20px 40px;
+        }
+        #video, #canvas, #capturedCanvas {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        #captureStatus {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+    </style>
 </head>
 <body>
     <h1>Camera Capture with Cropping and Google Drive Upload</h1>
     <button id="authorizeButton" style="display: none;">Authorize Google Drive</button>
-    <video id="video" autoplay style="display: block; margin-bottom: 10px;"></video>
-    <canvas id="canvas" style="display: block; margin-bottom: 10px;"></canvas>
-    <button id="captureButton" style="display: none;">Capture and Upload Image</button>
-    <canvas id="capturedCanvas" style="display: block; margin-top: 10px;"></canvas>
+    <video id="video" autoplay style="display: block; margin: 10px auto;"></video>
+    <canvas id="canvas" style="display: block; margin: 10px auto;"></canvas>
+    <button id="captureButton" style="display: none;">Capture and Upload Images</button>
+    <div id="captureStatus"></div>
+    <canvas id="capturedCanvas" style="display: block; margin: 10px auto;"></canvas>
     
     <script>
         const CLIENT_ID = '594274957992-ev098ch3cl1m1n7oc15nvmlkkkaj5o8e.apps.googleusercontent.com';
@@ -25,10 +66,12 @@
         const authorizeButton = document.getElementById('authorizeButton');
         const capturedCanvas = document.getElementById('capturedCanvas');
         const capturedContext = capturedCanvas.getContext('2d');
+        const captureStatus = document.getElementById('captureStatus');
 
         let tokenClient;
         let gapiInited = false;
         let gisInited = false;
+        let imageCounter = 0;
 
         function gapiLoaded() {
             gapi.load('client', initializeGapiClient);
@@ -111,6 +154,7 @@
         }
 
         captureButton.addEventListener('click', () => {
+            imageCounter++;
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
@@ -131,9 +175,13 @@
             capturedCanvas.height = cropHeight;
             capturedContext.putImageData(croppedImageData, 0, 0);
 
+            const originalImageURL = canvas.toDataURL('image/png');
             const croppedImageURL = capturedCanvas.toDataURL('image/png');
 
-            uploadImageToDrive(croppedImageURL);
+            uploadImageToDrive(originalImageURL, `image_${imageCounter}_original`);
+            uploadImageToDrive(croppedImageURL, `image_${imageCounter}_cropped`);
+
+            captureStatus.textContent = "Images have been captured and are being uploaded...";
         });
 
         async function getOrCreateFolder() {
@@ -163,7 +211,7 @@
             }
         }
 
-        async function uploadImageToDrive(imageDataUrl) {
+        async function uploadImageToDrive(imageDataUrl, fileName) {
             try {
                 const folderId = '13VlMerTuMhIhnYLKz-yGXeU_eVgqwa6b'
 
@@ -177,11 +225,10 @@
                 }
 
                 const blob = new Blob([buffer], { type: mimeString });
-                const fileName = `captured_image_${new Date().toISOString()}.png`;
 
                 const form = new FormData();
                 form.append('metadata', new Blob([JSON.stringify({
-                    name: fileName,
+                    name: `${fileName}.png`,
                     mimeType: 'image/png',
                     parents: [folderId]
                 })], { type: 'application/json' }));
@@ -195,8 +242,10 @@
                         const response = JSON.parse(xhr.responseText);
                         if (xhr.status === 200) {
                             console.log('File uploaded successfully, ID:', response.id);
+                            captureStatus.textContent = "Images have been captured and uploaded successfully!";
                         } else {
                             console.error('Error uploading file:', xhr.responseText);
+                            captureStatus.textContent = "Error uploading images. Please try again.";
                         }
                     }
                 };
@@ -204,6 +253,7 @@
 
             } catch (err) {
                 console.error('Error uploading file:', err);
+                captureStatus.textContent = "Error uploading images. Please try again.";
             }
         }
     </script>
